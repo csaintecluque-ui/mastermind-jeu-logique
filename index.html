@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>🧠 Mastermind - Jeu de Logique</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html, body { touch-action: manipulation; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            min-height: -webkit-fill-available;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+            padding-bottom: env(safe-area-inset-bottom, 16px);
+        }
+        .game-container {
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 480px;
+            width: 100%;
+        }
+        h1 { text-align: center; color: #333; margin-bottom: 5px; font-size: 26px; }
+        .subtitle { text-align: center; color: #666; margin-bottom: 12px; font-size: 14px; }
+        .attempts { text-align: center; color: #555; font-size: 14px; margin-bottom: 10px; font-weight: 600; }
+        .attempts span { color: #667eea; font-size: 18px; }
+        .message {
+            text-align: center; padding: 12px; border-radius: 10px; margin-bottom: 10px;
+            font-weight: bold; display: none; font-size: 15px;
+        }
+        .message.win { background: #d4edda; color: #155724; display: block; animation: pop 0.3s; }
+        .message.lose { background: #f8d7da; color: #721c24; display: block; }
+        @keyframes pop { 0% { transform: scale(0.8); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+        @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+        .secret-label { text-align: center; font-size: 11px; color: #888; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px; }
+        .secret { display: flex; gap: 8px; justify-content: center; margin-bottom: 16px; padding: 10px; background: #f0f0f0; border-radius: 12px; }
+        .secret .peg { width: 34px; height: 34px; border-radius: 50%; background: #444; border: 3px solid #333; box-shadow: inset 0 -3px 6px rgba(0,0,0,0.3); }
+        .secret .peg.revealed { box-shadow: 0 3px 8px rgba(0,0,0,0.2); }
+        .board { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+        .row { display: flex; gap: 8px; align-items: center; padding: 8px; background: #f8f8f8; border-radius: 10px; border: 2px solid transparent; }
+        .row.current { background: #fff8e1; border-color: #ffc107; }
+        .row.done { background: #eef; opacity: 0.85; }
+        .pegs { display: flex; gap: 10px; flex: 1; justify-content: center; }
+        .peg {
+            width: 44px; height: 44px;
+            min-width: 44px; min-height: 44px;
+            border-radius: 50%;
+            border: 3px solid #ddd;
+            cursor: pointer;
+            transition: transform 0.1s;
+            background: white;
+            touch-action: manipulation;
+            -webkit-user-select: none; user-select: none;
+        }
+        .peg:active { transform: scale(0.92); }
+        .peg.filled { border-color: rgba(0,0,0,0.15); box-shadow: inset 0 -4px 8px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.1); }
+        .feedback { display: grid; grid-template-columns: repeat(2, 13px); grid-template-rows: repeat(2, 13px); gap: 3px; padding: 4px; background: #e0e0e0; border-radius: 8px; }
+        .feedback-peg { width: 13px; height: 13px; border-radius: 50%; border: 1px solid #bbb; background: #eee; }
+        .feedback-peg.black { background: #222; border-color: #000; }
+        .feedback-peg.white { background: #fff; border-color: #555; box-shadow: inset 0 0 3px rgba(0,0,0,0.2); }
+        .palette-label { text-align: center; font-size: 11px; color: #888; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+        .palette { display: flex; gap: 8px; justify-content: center; margin-bottom: 14px; padding: 10px; background: #f5f5f5; border-radius: 12px; flex-wrap: wrap; }
+        .palette .peg { width: 46px; height: 46px; min-width: 46px; min-height: 46px; box-shadow: inset 0 -4px 8px rgba(0,0,0,0.2), 0 2px 4px rgba(0,0,0,0.1); }
+        .palette .peg.selected { border-color: #222; box-shadow: 0 0 0 3px #667eea, inset 0 -4px 8px rgba(0,0,0,0.2); }
+        .buttons { display: flex; flex-direction: column; gap: 8px; }
+        button {
+            width: 100%; padding: 16px;
+            min-height: 50px;
+            border: none; border-radius: 12px;
+            font-size: 16px; font-weight: bold;
+            cursor: pointer;
+            font-family: inherit;
+            touch-action: manipulation;
+            -webkit-appearance: none; appearance: none;
+            -webkit-user-select: none; user-select: none;
+        }
+        button:active:not(:disabled) { transform: scale(0.97); opacity: 0.9; }
+        .btn-validate { background: #667eea; color: white; }
+        .btn-validate:disabled { background: #ccc; cursor: not-allowed; }
+        .btn-clear { background: #e0e0e0; color: #555; }
+        .btn-clear:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-restart { background: #764ba2; color: white; }
+        .legend { font-size: 11px; color: #777; text-align: center; margin-top: 12px; line-height: 1.6; }
+        .legend-item { display: inline-flex; align-items: center; gap: 4px; margin: 0 6px; }
+        .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; border: 1px solid #999; }
+        .dot.black { background: #222; }
+        .dot.white { background: #fff; }
+        .stats { display: flex; justify-content: space-around; margin-bottom: 10px; font-size: 12px; color: #666; }
+        .stat { text-align: center; }
+        .stat-value { font-size: 18px; font-weight: bold; color: #667eea; }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>🧠 Mastermind</h1>
+        <p class="subtitle">Devinez le code secret en 10 coups !</p>
+        <div class="stats">
+            <div class="stat"><div class="stat-value" id="wins">0</div><div>Victoires</div></div>
+            <div class="stat"><div class="stat-value" id="games">0</div><div>Parties</div></div>
+            <div class="stat"><div class="stat-value" id="streak">0</div><div>Série</div></div>
+        </div>
+        <div class="attempts">Coups restants : <span id="attempts-left">10</span></div>
+        <div class="message" id="message"></div>
+        <div class="secret-label">Code secret</div>
+        <div class="secret" id="secret">
+            <div class="peg"></div><div class="peg"></div><div class="peg"></div><div class="peg"></div>
+        </div>
+        <div class="board" id="board"></div>
+        <div class="palette-label">Choisissez une couleur</div>
+        <div class="palette" id="palette"></div>
+        <div class="buttons">
+            <button type="button" class="btn-validate" id="btn-validate">✅ Valider ce coup</button>
+            <button type="button" class="btn-clear" id="btn-clear">🗑️ Effacer la ligne</button>
+            <button type="button" class="btn-restart" id="btn-restart">🔄 Nouvelle partie</button>
+        </div>
+        <p class="legend">
+            <span class="legend-item"><span class="dot black"></span> Bonne couleur, bonne place</span>
+            <span class="legend-item"><span class="dot white"></span> Bonne couleur, mauvaise place</span>
+        </p>
+    </div>
+
+<script>
+(function() {
+    "use strict";
+
+    var COLORS = [
+        { name: "Rouge", hex: "#e74c3c" },
+        { name: "Bleu", hex: "#3498db" },
+        { name: "Vert", hex: "#2ecc71" },
+        { name: "Jaune", hex: "#f1c40f" },
+        { name: "Violet", hex: "#9b59b6" },
+        { name: "Orange", hex: "#e67e22" }
+    ];
+    var CODE_LENGTH = 4;
+    var MAX_ATTEMPTS = 10;
+    var secretCode = [];
+    var currentRow = 0;
+    var selectedColorIndex = 0;
+    var gameOver = false;
+    var stats = { wins: 0, games: 0, streak: 0 };
+
+    // Safe localStorage access (fixes iOS Private Mode crash)
+    function safeGet(key) {
+        try { return localStorage.getItem(key); } catch(e) { return null; }
+    }
+    function safeSet(key, value) {
+        try { localStorage.setItem(key, value); } catch(e) {}
+    }
+
+    var saved = safeGet("mastermind-stats");
+    if (saved) {
+        try { stats = JSON.parse(saved); } catch(e) {}
+    }
+
+    function saveStats() {
+        safeSet("mastermind-stats", JSON.stringify(stats));
+        updateStatsDisplay();
+    }
+
+    function updateStatsDisplay() {
+        document.getElementById("wins").textContent = stats.wins;
+        document.getElementById("games").textContent = stats.games;
+        document.getElementById("streak").textContent = stats.streak;
+    }
+
+    function initGame() {
+        secretCode = [];
+        for (var i = 0; i < CODE_LENGTH; i++) {
+            secretCode.push(Math.floor(Math.random() * COLORS.length));
+        }
+        currentRow = 0;
+        gameOver = false;
+        selectedColorIndex = 0;
+        stats.games++;
+        saveStats();
+        document.getElementById("attempts-left").textContent = MAX_ATTEMPTS;
+        var msg = document.getElementById("message");
+        msg.className = "message";
+        msg.textContent = "";
+        document.getElementById("btn-validate").disabled = false;
+        document.getElementById("btn-clear").disabled = false;
+
+        var secretPegs = document.querySelectorAll("#secret .peg");
+        for (var s = 0; s < secretPegs.length; s++) {
+            secretPegs[s].style.background = "#444";
+            secretPegs[s].classList.remove("revealed");
+            secretPegs[s].title = "";
+        }
+
+        var board = document.getElementById("board");
+        board.innerHTML = "";
+
+        for (var r = 0; r < MAX_ATTEMPTS; r++) {
+            var row = document.createElement("div");
+            row.className = "row";
+            row.id = "row-" + r;
+
+            var pegsDiv = document.createElement("div");
+            pegsDiv.className = "pegs";
+
+            for (var c = 0; c < CODE_LENGTH; c++) {
+                var peg = document.createElement("div");
+                peg.className = "peg";
+                peg.setAttribute("data-row", r);
+                peg.setAttribute("data-col", c);
+                peg.setAttribute("data-color", "");
+                (function(rowIdx, colIdx, pegEl) {
+                    pegEl.addEventListener("click", function(e) {
+                        e.preventDefault();
+                        fillPeg(rowIdx, colIdx);
+                    });
+                    pegEl.addEventListener("touchstart", function(e) {
+                        e.preventDefault();
+                        fillPeg(rowIdx, colIdx);
+                    }, { passive: false });
+                })(r, c, peg);
+                pegsDiv.appendChild(peg);
+            }
+
+            var feedback = document.createElement("div");
+            feedback.className = "feedback";
+            for (var f = 0; f < CODE_LENGTH; f++) {
+                var fp = document.createElement("div");
+                fp.className = "feedback-peg";
+                feedback.appendChild(fp);
+            }
+
+            row.appendChild(pegsDiv);
+            row.appendChild(feedback);
+            board.appendChild(row);
+        }
+
+        updateActiveRow();
+
+        var palette = document.getElementById("palette");
+        palette.innerHTML = "";
+        COLORS.forEach(function(color, index) {
+            var peg = document.createElement("div");
+            peg.className = "peg" + (index === 0 ? " selected" : "");
+            peg.style.background = color.hex;
+            peg.title = color.name;
+            (function(idx, pegEl) {
+                pegEl.addEventListener("click", function(e) {
+                    e.preventDefault();
+                    selectColor(idx, pegEl);
+                });
+                pegEl.addEventListener("touchstart", function(e) {
+                    e.preventDefault();
+                    selectColor(idx, pegEl);
+                }, { passive: false });
+            })(index, peg);
+            palette.appendChild(peg);
+        });
+    }
+
+    window.selectColor = function(index, pegElement) {
+        selectedColorIndex = index;
+        var allPegs = document.querySelectorAll("#palette .peg");
+        for (var i = 0; i < allPegs.length; i++) {
+            allPegs[i].classList.remove("selected");
+        }
+        pegElement.classList.add("selected");
+    };
+
+    window.fillPeg = function(row, col) {
+        if (gameOver || row !== currentRow) return;
+        var selector = "#row-" + row + " .peg[data-col=\"" + col + "\"]";
+        var peg = document.querySelector(selector);
+        if (!peg) return;
+        if (peg.getAttribute("data-color") === "") {
+            peg.setAttribute("data-color", String(selectedColorIndex));
+            peg.style.background = COLORS[selectedColorIndex].hex;
+            peg.classList.add("filled");
+        }
+    };
+
+    window.clearRow = function() {
+        if (gameOver || currentRow >= MAX_ATTEMPTS) return;
+        var row = document.getElementById("row-" + currentRow);
+        if (!row) return;
+        var pegs = row.querySelectorAll(".pegs .peg");
+        for (var i = 0; i < pegs.length; i++) {
+            pegs[i].setAttribute("data-color", "");
+            pegs[i].style.background = "white";
+            pegs[i].classList.remove("filled");
+        }
+    };
+
+    function updateActiveRow() {
+        var rows = document.querySelectorAll(".row");
+        for (var i = 0; i < rows.length; i++) {
+            rows[i].classList.remove("current", "done");
+            if (i === currentRow && !gameOver) {
+                rows[i].classList.add("current");
+            } else if (i < currentRow) {
+                rows[i].classList.add("done");
+            }
+        }
+    }
+
+    window.validateRow = function() {
+        if (gameOver) return;
+        var row = document.getElementById("row-" + currentRow);
+        if (!row) return;
+        var pegs = row.querySelectorAll(".pegs .peg");
+        var guess = [];
+        var allFilled = true;
+        for (var i = 0; i < pegs.length; i++) {
+            var val = pegs[i].getAttribute("data-color");
+            if (val === "" || val === null) {
+                allFilled = false;
+            } else {
+                guess.push(parseInt(val, 10));
+            }
+        }
+        if (!allFilled) {
+            row.style.animation = "shake 0.4s";
+            setTimeout(function() { row.style.animation = ""; }, 400);
+            return;
+        }
+        var black = 0;
+        var white = 0;
+        var secretCopy = secretCode.slice();
+        var guessCopy = guess.slice();
+        for (var a = 0; a < CODE_LENGTH; a++) {
+            if (guessCopy[a] === secretCopy[a]) {
+                black++;
+                secretCopy[a] = -1;
+                guessCopy[a] = -1;
+            }
+        }
+        for (var b = 0; b < CODE_LENGTH; b++) {
+            if (guessCopy[b] !== -1) {
+                var idx = secretCopy.indexOf(guessCopy[b]);
+                if (idx !== -1) {
+                    white++;
+                    secretCopy[idx] = -1;
+                }
+            }
+        }
+        var feedbackPegs = row.querySelectorAll(".feedback-peg");
+        var fi = 0;
+        for (var x = 0; x < black; x++) { feedbackPegs[fi].classList.add("black"); fi++; }
+        for (var y = 0; y < white; y++) { feedbackPegs[fi].classList.add("white"); fi++; }
+
+        if (black === CODE_LENGTH) {
+            gameOver = true;
+            stats.wins++;
+            stats.streak++;
+            saveStats();
+            showMessage("🎉 Bravo ! Code trouvé en " + (currentRow + 1) + " coup" + (currentRow > 0 ? "s" : "") + " !", "win");
+            revealSecret();
+            document.getElementById("btn-validate").disabled = true;
+            document.getElementById("btn-clear").disabled = true;
+            updateActiveRow();
+            return;
+        }
+
+        currentRow++;
+        document.getElementById("attempts-left").textContent = (MAX_ATTEMPTS - currentRow);
+
+        if (currentRow >= MAX_ATTEMPTS) {
+            gameOver = true;
+            stats.streak = 0;
+            saveStats();
+            var codeStr = secretCode.map(function(i) { return COLORS[i].name; }).join(", ");
+            showMessage("😢 Perdu ! Le code était : " + codeStr, "lose");
+            revealSecret();
+            document.getElementById("btn-validate").disabled = true;
+            document.getElementById("btn-clear").disabled = true;
+        }
+        updateActiveRow();
+    };
+
+    function revealSecret() {
+        var secretPegs = document.querySelectorAll("#secret .peg");
+        for (var i = 0; i < secretPegs.length; i++) {
+            secretPegs[i].style.background = COLORS[secretCode[i]].hex;
+            secretPegs[i].classList.add("revealed");
+            secretPegs[i].title = COLORS[secretCode[i]].name;
+        }
+    }
+
+    function showMessage(text, type) {
+        var msg = document.getElementById("message");
+        msg.textContent = text;
+        msg.className = "message " + type;
+    }
+
+    // Bind buttons with addEventListener (more reliable on iOS than inline onclick)
+    document.getElementById("btn-validate").addEventListener("click", function(e) {
+        e.preventDefault();
+        validateRow();
+    });
+    document.getElementById("btn-validate").addEventListener("touchstart", function(e) {
+        e.preventDefault();
+        validateRow();
+    }, { passive: false });
+
+    document.getElementById("btn-clear").addEventListener("click", function(e) {
+        e.preventDefault();
+        clearRow();
+    });
+    document.getElementById("btn-clear").addEventListener("touchstart", function(e) {
+        e.preventDefault();
+        clearRow();
+    }, { passive: false });
+
+    document.getElementById("btn-restart").addEventListener("click", function(e) {
+        e.preventDefault();
+        initGame();
+    });
+    document.getElementById("btn-restart").addEventListener("touchstart", function(e) {
+        e.preventDefault();
+        initGame();
+    }, { passive: false });
+
+    // Prevent double-tap zoom on the whole game
+    document.addEventListener("touchend", function(e) {
+        if (e.target.tagName !== "INPUT" && e.target.tagName !== "TEXTAREA") {
+            e.preventDefault();
+        }
+    }, { passive: false });
+
+    // Initialize on DOMContentLoaded or immediately if already loaded
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", function() {
+            updateStatsDisplay();
+            initGame();
+        });
+    } else {
+        updateStatsDisplay();
+        initGame();
+    }
+})();
+</script>
+</body>
+</html>
